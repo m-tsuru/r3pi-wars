@@ -2,9 +2,9 @@ import socket
 import time
 
 from internal import r3pi
+from internal.boundary_detection import CONTROL_INTERVAL, BoundaryDetectionError
 from internal.commands import ReceiveCommandPacket
 from internal.handlers import handle_command, stop_robot, update_robot
-from internal.linetrace import CONTROL_INTERVAL, LineTraceError
 from internal.sensors import SensorReadError
 
 HOST = "0.0.0.0"
@@ -49,12 +49,6 @@ def main():
             except SensorReadError as e:
                 print("Sensor Error:", e)
                 sock.sendto(f"Error={e}".encode("utf-8"), addr)
-            except LineTraceError as e:
-                print("Line Trace Error:", e)
-                last_received = time.monotonic()
-                watchdog_stopped = False
-                detail = str(e).replace(":", " ").replace("\n", " ")
-                sock.sendto(f"Status=Stopped:Error={detail}".encode("utf-8"), addr)
             except (ValueError, UnicodeDecodeError) as e:
                 print("Invalid Command:", e)
 
@@ -67,11 +61,13 @@ def main():
 
             try:
                 update_robot()
-            except LineTraceError as e:
-                print("Line Trace Error:", e)
+            except BoundaryDetectionError as e:
+                print("Boundary Detection Error:", e)
                 if last_address is not None:
                     detail = str(e).replace(":", " ").replace("\n", " ")
-                    sock.sendto(f"Status=Stopped:Error={detail}".encode("utf-8"), last_address)
+                    sock.sendto(
+                        f"Status=Stopped:Error={detail}".encode("utf-8"), last_address
+                    )
 
     finally:
         try:

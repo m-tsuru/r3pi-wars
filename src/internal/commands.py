@@ -13,7 +13,7 @@ def is_float(s: str) -> bool:
 @dataclass
 class Command:
     key: str
-    value: str | float | int
+    value: str | float | int | bool
 
     def __init__(self, raw_command: str, delimiter: str = "=") -> None:
         commands = raw_command.split(delimiter)
@@ -36,10 +36,10 @@ class Command:
                     raise ValueError("値が不正です")
             case "Stop":
                 self.value = int(raw_value)
-            case "Linetrace":
-                self.value = int(raw_value)
-                if self.value not in (0, 1):
+            case "BoundaryDetection":
+                if raw_value.lower() not in ("false", "true", "0", "1"):
                     raise ValueError("値が不正です")
+                self.value = raw_value.lower() in ("true", "1")
             case "Sensor":
                 if raw_value not in ("TP", "BR", "DT", "BT"):
                     raise ValueError("存在しないセンサーです")

@@ -1,64 +1,47 @@
+from .boundary_detection import BoundaryDetector
 from .commands import Command, SendSensorPacket
-from .linetrace import LineTracer
 from .sensors import read_sensor
 
 MAX_SPEED = 1.0
 
-_line_tracer = LineTracer()
+_boundary_detector = BoundaryDetector()
 
 
 def stop_robot() -> None:
-    from . import r3pi
-
-    _line_tracer.stop()
-    r3pi.PID_stop()
-    r3pi.stop()
+    _boundary_detector.stop()
 
 
 def update_robot() -> None:
-    _line_tracer.update()
-
-
-def _trace_status() -> SendSensorPacket:
-    response = SendSensorPacket()
-    response.push("Status", "Tracing" if _line_tracer.running else "Stopped")
-    return response
+    _boundary_detector.update()
 
 
 def handle_command(command: Command) -> SendSensorPacket | None:
     if command.key == "Sensor":
         return read_sensor(str(command.value))
 
-    # UART の初期化は、実際にコマンドを処理するときまで遅延する。
-    from . import r3pi
-
     match command.key:
         case "Stop":
             stop_robot()
-            return _trace_status()
-        case "Linetrace":
-            if command.value == 1:
-                _line_tracer.start()
-            else:
-                stop_robot()
-            return _trace_status()
+            response = SendSensorPacket()
+            response.push("Status", "Stopped")
+            return response
+        case "BoundaryDetection":
+            _boundary_detector.set_enabled(enabled=bool(command.value))
         case "Forward" | "Backward" | "Left" | "Right" | "LeftMotor" | "RightMotor":
-            # 手動操作へ切り替えた後はPD制御がモーター値を上書きしない。
-            if _line_tracer.running:
-                _line_tracer.stop()
             speed = float(command.value) * MAX_SPEED
             match command.key:
                 case "Forward":
-                    r3pi.forward(speed)
+                    _boundary_detector.drive(speed, speed)
                 case "Backward":
-                    r3pi.backward(speed)
+                    _boundary_detector.drive(-speed, -speed)
                 case "Left":
-                    r3pi.left(speed)
+                    _boundary_detector.drive(-speed, speed)
                 case "Right":
-                    r3pi.right(speed)
+                    _boundary_detector.drive(speed, -speed)
                 case "LeftMotor":
-                    r3pi.left_motor(speed)
+                    _boundary_detector.drive(left=speed)
                 case "RightMotor":
-                    r3pi.right_motor(speed)
+                    _boundary_detector.drive(right=speed)
         case _:
             raise ValueError("存在しないコマンドです")
+    return None
