@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Log Charts</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+
+        h1 {
+            font-size: 24px;
+        }
+
+        .chart-box {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>ロググラフ（IPアドレス別・キーごとに最新50件）</h1>
+    <div id="charts"></div>
+
+    <script id="graph-data" type="application/json">{}</script>
+
+    <script>
+        const rawText = document.getElementById("graph-data").textContent.trim();
+        const data = rawText ? JSON.parse(rawText) : {};
+
+        const container = document.getElementById("charts");
+        const PALETTE = [
+            "rgb(54, 162, 235)",
+            "rgb(255, 99, 132)",
+            "rgb(75, 192, 192)",
+            "rgb(255, 159, 64)",
+            "rgb(153, 102, 255)",
+            "rgb(46, 184, 92)"
+        ];
+
+        function withAlpha(color, alpha) {
+            return color.startsWith("rgb(")
+                ? color.replace("rgb(", "rgba(").replace(")", `, ${alpha})`)
+                : color;
+        }
+
+        if (Object.keys(data).length === 0) {
+            container.textContent = "表示できる数値データがありません。";
+        }
+
+        const ipColors = new Map();
+        for (const value of Object.values(data)) {
+            if (!Array.isArray(value) && value && typeof value === "object") {
+                for (const ip of Object.keys(value)) {
+                    if (!ipColors.has(ip)) {
+                        const idx = ipColors.size;
+                        ipColors.set(
+                            ip,
+                            ip === "unknown"
+                                ? "rgb(120, 128, 138)"
+                                : PALETTE[idx % PALETTE.length]
+                        );
+                    }
+                }
+            }
+        }
+
+        for (const [key, seriesOrPoints] of Object.entries(data)) {
+            const box = document.createElement("div");
+            box.className = "chart-box";
+
+            const heading = document.createElement("h2");
+            heading.textContent = key;
+            box.appendChild(heading);
+
+            const chartContainer = document.createElement("div");
+            chartContainer.className = "chart-container";
+
+            const canvas = document.createElement("canvas");
+            chartContainer.appendChild(canvas);
+            box.appendChild(chartContainer);
+            container.appendChild(box);
+
+            const datasets = Array.isArray(seriesOrPoints)
+                ? [{
+                    label: key,
+                    data: seriesOrPoints,
+                    borderColor: "rgb(54, 162, 235)",
+                    backgroundColor: "rgba(54, 162, 235, 0.1)",
+                    tension: 0.2,
+                    pointRadius: 3,
+                    fill: false
+                }]
+                : Object.entries(seriesOrPoints).map(([ip, points]) => {
+                    const color = ipColors.get(ip) || "rgb(54, 162, 235)";
+                    return {
+                        label: ip,
+                        data: points,
+                        borderColor: color,
+                        backgroundColor: withAlpha(color, 0.12),
+                        tension: 0.2,
+                        pointRadius: 3,
+                        fill: false
+                    };
+                });
+
+            new Chart(canvas, {
+                type: "line",
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    parsing: false,
+                    plugins: {
+                        legend: {
+                            display: !Array.isArray(seriesOrPoints)
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function (items) {
+                                    if (!items.length) return "";
+
+                                    return new Date(items[0].parsed.x).toLocaleString(
+                                        "ja-JP", {
+                                        timeZone: "Asia/Tokyo",
+                                        year: "numeric",
+                                        month: "2-digit",
+                                        day: "2-digit",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                        second: "2-digit",
+                                        hour12: false
+                                    });
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: "linear",
+                            title: {
+                                display: true,
+                                text: "日時（JST）"
+                            },
+                            ticks: {
+                                maxTicksLimit: 6,
+                                callback: function (value) {
+                                    return new Date(value).toLocaleString("ja-JP", {
+                                        timeZone: "Asia/Tokyo",
+                                        month: "2-digit",
+                                        day: "2-digit",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                        second: "2-digit",
+                                        hour12: false
+                                    });
+                                }
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: "値"
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>

@@ -40,6 +40,20 @@ class Command:
                 if raw_value.lower() not in ("false", "true", "0", "1"):
                     raise ValueError("値が不正です")
                 self.value = raw_value.lower() in ("true", "1")
+            case "GraphSend":
+                normalized = raw_value.lower()
+                if normalized not in (
+                    "false",
+                    "true",
+                    "0",
+                    "1",
+                    "stop",
+                    "start",
+                    "off",
+                    "on",
+                ):
+                    raise ValueError("値が不正です")
+                self.value = normalized in ("true", "1", "start", "on")
             case "Sensor":
                 if raw_value not in ("TP", "BR", "DT", "BT"):
                     raise ValueError("存在しないセンサーです")

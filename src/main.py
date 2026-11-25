@@ -4,7 +4,8 @@ import time
 from internal import r3pi
 from internal.boundary_detection import CONTROL_INTERVAL, BoundaryDetectionError
 from internal.commands import ReceiveCommandPacket
-from internal.handlers import handle_command, stop_robot, update_robot
+from internal.handlers import handle_command, stop_graph_send, stop_robot, update_robot
+from internal.send_sensor import SensorSendError
 from internal.sensors import SensorReadError
 
 HOST = "0.0.0.0"
@@ -46,9 +47,10 @@ def main():
                             sock.sendto(response.to_bytes(), addr)
                     last_received = time.monotonic()
                     watchdog_stopped = False
-            except SensorReadError as e:
+            except (SensorReadError, SensorSendError) as e:
                 print("Sensor Error:", e)
-                sock.sendto(f"Error={e}".encode("utf-8"), addr)
+                detail = str(e).replace(":", " ").replace("\r", " ").replace("\n", " ")
+                sock.sendto(f"Error={detail}".encode("utf-8"), addr)
             except (ValueError, UnicodeDecodeError) as e:
                 print("Invalid Command:", e)
 
@@ -71,6 +73,7 @@ def main():
 
     finally:
         try:
+            stop_graph_send()
             if robot_initialized:
                 stop_robot()
         finally:
